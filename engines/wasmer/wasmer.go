@@ -19,9 +19,9 @@ import (
 
 type (
 	engine struct {
-		useMetering     bool
-		maxInstructions uint64
-		pfn             unsafe.Pointer
+		useMetering        bool
+		maxGasUsageAllowed uint64
+		pfn                unsafe.Pointer
 	}
 
 	// Module represents a compile waPC module.
@@ -111,41 +111,10 @@ func Engine(opts ...EngineOption) wapc.Engine {
 }
 
 // WithMetering enables wasmer's middleware metering for this engine option
-//
-// example:
-//   //#include "wasmer.h"
-//   //__attribute__((weak))
-//   //extern uint64_t meteringFn(enum wasmer_parser_operator_t op);
-//   import "C"
-//   import (
-//     "context"
-//     "unsafe"
-//     wapc "github.com/wapc/wapc-go"
-//     "github.com/wapc/wapc-go/engines/wasmer"
-//   )
-//
-//
-//   func getInternalCPointer() unsafe.Pointer {
-//     return unsafe.Pointer(C.meteringFn)
-//   }
-//
-//   //export meteringFn
-//   func meteringFn(op C.wasmer_parser_operator_t) C.uint64_t {
-//     if op >= C.I32Load && op <= C.I64TruncSatF64U {
-//        return 1
-//     }
-//     return 0
-//   }
-//
-//   func main{
-//      config := &wapc.ModuleConfig{}
-//      engOpt := wasmer.WithMetering(uint64(gas), getInternalCPointer())
-//      engine := wasmer.Engine(engOpt).New(context.TODO(), cb, b, config)
-//   }
-func WithMetering(maxInstructions uint64, pfn unsafe.Pointer) EngineOption {
+func WithMetering(maxGasUsageAllowed uint64, pfn unsafe.Pointer) EngineOption {
 	return func(e *engine) {
 		e.useMetering = true
-		e.maxInstructions = maxInstructions
+		e.maxGasUsageAllowed = maxGasUsageAllowed
 		e.pfn = pfn
 	}
 }
@@ -161,7 +130,7 @@ func (e *engine) New(_ context.Context, host wapc.HostCallHandler, guest []byte,
 	if e.useMetering {
 		store = wasmer.NewStore(
 			wasmer.NewEngineWithConfig(
-				wasmer.NewConfig().PushMeteringMiddlewarePtr(e.maxInstructions, e.pfn),
+				wasmer.NewConfig().PushMeteringMiddlewarePtr(e.maxGasUsageAllowed, e.pfn),
 			),
 		)
 	} else {
